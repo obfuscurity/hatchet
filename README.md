@@ -6,6 +6,10 @@ Hatchet is a log parsing/presentation program written for OpenBSD's PF logs. The
 
 Hatchet uses a series of Perl regexes to match entries from the pflog logs. The log entries are stored in a SQLite database file, allowing for highly dynamic queries and statistics. If it finds one it doesn't have a match for, it will kick off an email to the system administrator (`root@localhost`) with the details. This setting can be modified in the configuration file (`hatchet.conf`).
 
+## Screenshots
+
+![Events Listing](blob/master/images/screenshot.png)
+
 ## Installation
 
 Hatchet uses the default OpenBSD httpd chroot. This is made possible thanks to mod_perl. No special effort is required outside of the instructions listed below.
