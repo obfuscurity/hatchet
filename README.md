@@ -8,7 +8,7 @@ Hatchet uses a series of Perl regexes to match entries from the pflog logs. The 
 
 ## Screenshots
 
-![Events Listing](hatchet/blob/master/images/screenshot.png)
+![Events Listing](https://raw.github.com/obfuscurity/hatchet/master/images/screenshot.png)
 
 ## Installation
 
