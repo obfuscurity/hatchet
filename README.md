@@ -12,14 +12,14 @@ Thanks for trying out Hatchet. Please email me with your feedback, compliments, 
 
 Hatchet uses the default OpenBSD httpd chroot. This is made possible thanks to mod_perl. No special effort is required outside of the instructions listed below.
 
-1. Install the Hatchet directory
+Install the Hatchet directory:
 
 ```bash
 $ tar zxvf hatchet-0.9.2.tar.gz
 $ sudo mv hatchet-0.9.2 /var/www/hatchet
 ```
 
-2. Install the following Perl modules
+Install the following Perl modules:
 
 ```
 DBI (databases/p5-DBI)
@@ -30,13 +30,13 @@ GD::Text (graphics/p5-GD-TextUtil)
 HTML::Template (www/p5-HTML-Template)
 ```
 
-3. Install mod_perl (www/mod_perl) and enable the module
+Install mod_perl (www/mod_perl) and enable the module:
 
 ```bash
 $ sudo mod_perl-enable
 ```
 
-4. Add an entry in httpd.conf and restart httpd. Example:
+Add an entry in httpd.conf and restart httpd. Example:
 
 ```
         <VirtualHost _default_:80>
@@ -53,14 +53,14 @@ $ sudo mod_perl-enable
         </VirtualHost>
 ```
 
-5. Create the database
+Create the database
 
 ```bash
 $ cd /var/www/hatchet/sbin/
 $ sudo ./hatchet_mkdb
 ```
 
-6. Add the following lines in crontab. If done as a non-root user, make sure to use sudo.
+Add the cron entries:
 
 ```bash
 14,29,44,59 * * * *     sudo /var/www/hatchet/sbin/hatchet
