@@ -1,0 +1,303 @@
+#!/usr/bin/perl
+#
+# Hatchet pflog parser
+# v 0.9.2
+# Jason Dixon <jason@dixongroup.net>
+# http://www.dixongroup.net/hatchet/
+#
+
+use strict;
+use DBI;
+use Time::Local qw( timelocal_nocheck );
+
+our ($db_file, $stale, $log, $tcpdump, $admin_email);
+require "/var/www/hatchet/conf/hatchet.conf";
+
+my $dbh = DBI->connect("DBI:SQLite:dbname=$db_file", "", "") || die $DBI::errstr;
+$dbh->{AutoCommit} = 0;
+$dbh->{RaiseError} = 1;
+my $existing = check_existing();
+my $insert_stmt = "insert into logs (id, date, points, rulenum, action, interface, src_host, src_port, dst_host, dst_port, proto, comment) values (NULL, ?,?,?,?,?,?,?,?,?,?,?)";
+my $sth = $dbh->prepare($insert_stmt);
+my $rules = get_rules();
+my @new_regex;
+my $count;
+
+unless (-f $log) { die "Can't open file: $!"; }
+open(IN, "$tcpdump -neltttr $log 2>&1 |");
+
+eval {
+	while (<IN>) {
+		next if /tcpdump/;
+		next if /cookie: /;
+		next if /source quench/;
+		next if /igmp/;
+		next if /reassembly time exceeded/;
+		next if /multicast listener report/;
+		next if /at-\#/;
+		chomp;
+		if (/icmp6/) {
+			next if /who has/;
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: ([a-f0-9\:]+) > ([a-f0-9\:]+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp6', 'ICMP');
+			next;
+		} elsif (/ip6/ && /encap/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: .*/;
+			insert_table($1, $2, $3, $4, $5, 'encap', 'encap', 'encap', 'encap', 'IPv6');
+			next;
+		} elsif (/gre encap/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: .*/;
+			insert_table($1, $2, $3, $4, $5, 'encap', 'encap', 'encap', 'encap', 'GRE');
+			next;
+                } elsif (/RIPv1/ || /RIPv2-resp/) {
+                        /(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+                        insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'RIP');
+                        next;
+                } elsif (/lwres/) {
+                        /(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+                        insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'lwres');
+                        next;
+		} elsif (/ah/ && /spi/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: ah (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+) spi .*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'ah/spi', 'AH');
+			next;
+		} elsif (/esp/ && /spi/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: esp (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+) spi .*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'esp/spi', 'ESP');
+			next;
+		} elsif (/isakmp/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+			insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'isakmp');
+			next;
+		} elsif (/Unknown Version/ && /L2TP/ && /L2F/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+			insert_table($1, $2, $3, $4, $5, $6, $7, $8, 'lt2p/l2f unknown', 'L2TP');
+			next;
+		} elsif (/ip-proto-88/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+			insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'EIGRP');
+			next;
+		} elsif (/ip-proto-103/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+			insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'multicast');
+			next;
+		} elsif (/protocol 47 unreachable/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'gre unreachable', 'ICMP');
+			next;
+		} elsif (/protocol 6 unreachable/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'tcp unreachable', 'ICMP');
+			next;
+		} elsif (/protocol 1 port/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp unreachable', 'ICMP');
+			next;
+		} elsif (/icmp: time exceeded in-transit/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp time exceeded', 'ICMP');
+			next;
+		} elsif (/icmp: time stamp reply/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp time stamp reply', 'ICMP');
+			next;
+		} elsif (/icmp: host.*unreachable/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp host unreachable');
+			next;
+		} elsif (/icmp:.*unreachable/ && /source route failed/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\: icmp\: (\d+.\d+.\d+.\d+) (unreachable - source route failed).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, "icmp: $8 $9");
+			next;
+		} elsif (/icmp: net.*unreachable/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp net unreachable', 'ICMP');
+			next;
+		} elsif (/icmp: echo request/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp echo request', 'ICMP');
+			next;
+		} elsif (/icmp: echo reply/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp echo reply', 'ICMP');
+			next;
+		} elsif (/icmp: redirect/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp redirect', 'ICMP');
+			next;
+		} elsif (/icmp: parameter problem/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp param problem', 'ICMP');
+			next;
+		} elsif (/icmp:/ && /need to frag/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp need to frag', 'ICMP');
+			next;
+		} elsif (/icmp:/ && /router advertisement lifetime/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, 'icmp router adv-life', 'ICMP');
+			next;
+		} elsif (/icmp:/ && /udp port|tcp port|protocol/ && /unreachable/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+) > (\d+\.\d+\.\d+\.\d+).*(udp port|tcp port|protocol) (\d+) unreachable.*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', $7, "$8 $9 unreachable", 'ICMP');
+			next;
+		} elsif (/snmp/ || /GetNextRequest/ || /\[version\(\d+\)\!\=\d+\]/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+			insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'SNMP');
+			next;
+		} elsif (/HSRP/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/;
+			insert_table($1, $2, $3, $4, $5, $6, $7, $8, $9, 'HSRP');
+			next;
+		} elsif (/UPD/ || /BLK/ || /INS/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+).*/;
+			insert_table($1, $2, $3, $4, $5, $6, '', 'unknown', 'pfsync', 'PFSYNC');
+			next;
+		} elsif (/CARP/) {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: .*/;
+			insert_table($1, $2, $3, $4, $5, 'unknown', '', 'unknown', 'carp', 'CARP');
+			next;
+		} elsif (/win/ || /reply ok/ || /udp/i || /ServFail/ || /strat/ || /bootp/ || /NXDomain/ || /domain/ || /rad-account-req/ || /radius/ || /\d+\/\d+\/\d+/ || /\?/) {
+			my $input = $_;
+			my ($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $remainder);
+			SWITCH: {
+				if ($input =~ /(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/)
+					{
+						($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $remainder) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+						last SWITCH;
+					}
+				if ($input =~ /(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: (\d+\.\d+\.\d+\.\d+)\.(\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+)\:(.*)/)
+					{
+						($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $remainder) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+						last SWITCH;
+					}
+				if ($input =~ /(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: ([a-f0-9\:]+)\.(\d+) > ([a-f0-9\:]+)\.(\d+)\:(.*)/)
+					{
+						($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $remainder) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+						last SWITCH;
+					}
+				if ($input =~ /(\w+ \d+ \d+:.\d:.\d+)\.(\d+) rule (\d+)\/\(match\) (\w+ \w+) \w+ (\w+)\: ([a-f0-9\:]+)\.(\d+) > ([a-f0-9\:]+)\.(\d+)\:(.*)/)
+					{
+						($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $remainder) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+						last SWITCH;
+					}
+				}
+			my $proto = ($remainder =~ /win/) ? 'TCP' : 'UDP';
+			insert_table($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $proto);
+			next;
+		} else {
+			/(\w+ \d+ \d+:.\d:.\d+)\.(\d+)(.*)/;
+			my ($date, $points, $unknown) = ($1, $2, $3);
+			if ($date && $points && $unknown) {
+				$date =~ /^(\w+) (\d+) (\d+)\:(\d+)\:(\d+)$/;
+				insert_table($date, $points, '', '', '', '', '', '', 'NO REGEX', $unknown);
+				my %new_regex = (
+					date => $date,
+					points => $points,
+					unknown => $unknown,
+				);
+				push(@new_regex, \%new_regex);
+			} else {
+				next;
+			}
+		}
+	}
+	close(IN);
+	$dbh->commit;
+};
+
+if ($@) {
+	warn "Transaction aborted because $@";
+	eval { $dbh->rollback };
+	if ($@) {
+		die "Rollback also failed, exiting!";
+	} else {
+		die "Rollback successful, exiting!";
+	}
+}
+
+if (@new_regex > 0) {
+	mail_other(\@new_regex);
+}
+
+delete_old();
+
+sub insert_table {
+	my ($date, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $proto) = @_;
+	my @timestamp = localtime(time);
+	$date =~ /^(\w+) (\d+) (\d+)\:(\d+)\:(\d+)$/;
+	my ($month, $mday, $hour, $min, $sec, $year) = ($1, $2, $3, $4, $5, $timestamp[5]);
+	my %months = qw( Jan 0 Feb 1 Mar 2 Apr 3 May 4 Jun 5 Jul 6 Aug 7 Sep 8 Oct 9 Nov 10 Dec 11 );
+	my $epoch = timelocal_nocheck($sec, $min, $hour, $mday, $months{$month}, $year);
+	unless ($existing->{"$epoch $points"}) {
+		$sth->execute($epoch, $points, $rulenum, $action, $interface, $src_host, $src_port, $dst_host, $dst_port, $proto, $rules->{$rulenum});
+	}
+	return;
+}
+
+sub delete_old {
+	my $cutoff = time - ($stale * 24 * 60 * 60);
+	my $delete_stmt = "delete from logs where date <= ?";
+	my $sth = $dbh->prepare($delete_stmt);
+	$sth->execute($cutoff);
+	$dbh->commit;
+	if ($@) {
+		warn "Transaction aborted because $@";
+		eval { $dbh->rollback };
+		if ($@) {
+			die "Rollback also failed, exiting!";
+		} else {
+			die "Rollback successful, exiting!";
+		}
+	}
+}
+
+sub check_existing {
+	my $select = "select date, points, proto from logs";
+	my $sth = $dbh->prepare($select);
+	$sth->execute || die $dbh->stderr;
+	my %existing;
+	while (my $result = ($sth->fetchrow_hashref)) {
+		my $timestamp = $result->{'date'} . " " . $result->{'points'};
+		$existing{$timestamp} = 1;
+	}
+	return \%existing;
+}
+
+sub mail_other {
+	my $new_regex = shift;
+	my $count = 0;
+	my $body;
+	for my $line (@$new_regex) {
+		unless ($existing->{"$line->{'date'} $line->{'points'}"}) {
+			$body .= "$line->{'date'}.$line->{'points'} $line->{'unknown'}\n";
+			$count++;
+		}
+	}
+	if ($count > 0) {
+		my $hostname = `hostname`;
+		open(MAIL, "|mail -s 'Regex Updates' $admin_email");
+		print MAIL "The following log entry on $hostname does not match the pre-existing expressions.\n";
+		print MAIL "Please investigate and update your hatchet script.\n\n";
+		print MAIL $body;
+		print MAIL "Thank You,\nSystem Administrator";
+		close(MAIL);
+	}
+	return;
+}
+
+sub get_rules {
+	my %rules;
+	open(RULES, "/sbin/pfctl -vvsr | grep \"^@\" |");
+	while (<RULES>) {
+		chomp;
+		/\@(\d+) (\w+.*)/;
+		my ($index, $text) = ($1, $2);
+		$text =~ s/\</\&lt;/g;
+		$text =~ s/\>/\&gt;/g;
+		$rules{$index} = $text;
+	}
+	close(RULES);
+	return \%rules;
+}
+

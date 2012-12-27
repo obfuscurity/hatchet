@@ -1,0 +1,125 @@
+#!/usr/bin/perl
+#
+# Hatchet chart grapher
+# v 0.9.2
+# Jason Dixon <jason@dixongroup.net>
+# http://www.dixongroup.net/hatchet/
+#
+
+use strict;
+use DBI;
+use DBD::Chart;
+use Time::Local qw( timelocal );
+
+our ($db_file, $ipv6, $max_wedges, $width, $height, $graphs_dir);
+require "/var/www/hatchet/conf/hatchet.conf";
+
+my $dbh = DBI->connect("DBI:SQLite:dbname=$db_file", "", "") || die $DBI::errstr;
+my $date = get_date();
+
+my $top_sources_all = get_top_sources();
+my $top_services_all = get_top_services();
+my $top_sources_date = get_top_sources($date);
+my $top_services_date = get_top_services($date);
+
+print_graph($top_sources_all, $graphs_dir, 'hosts_all.png') if ($#$top_sources_all > 0);
+print_graph($top_services_all, $graphs_dir, 'ports_all.png') if ($#$top_services_all > 0);
+print_graph($top_sources_date, $graphs_dir, 'hosts_today.png') if ($#$top_sources_date > 0);
+print_graph($top_services_date, $graphs_dir, 'ports_today.png') if ($#$top_services_date > 0);
+
+sub get_date {
+	my ($day, $month, $year) = @{[localtime]}[3..5];
+	my $start_of_day = timelocal(0, 0, 0, $day, $month, $year);
+	my $end_of_day = timelocal(59, 59, 23, $day, $month, $year);
+	my @day = ($start_of_day, $end_of_day);
+	return \@day;
+}
+
+sub get_top_services {
+	my $date = shift || undef;
+	my $select_query = "select src_host, dst_port from logs";
+	if ($date) {
+		my ($start_of_day, $end_of_day) = @$date;
+		$select_query .= " where date >= $start_of_day and date <= $end_of_day";
+	}
+	my $sth = $dbh->prepare($select_query);
+	$sth->execute;
+	my %events;
+	my $total = 0;
+	while (my $result = $sth->fetchrow_hashref) {
+		next if (($result->{'src_host'} =~ /\:/) && ($ipv6 == 0));
+		$events{$result->{'dst_port'}}{'count'}++;
+		$total++;
+	}
+	my @sorted = sort {
+		$events{$b}{'count'} <=> $events{$a}{'count'}
+	} keys %events;
+	my @top_entries;
+	$max_wedges = @sorted if ($max_wedges >= @sorted);
+	for (my $i=0; $i<$max_wedges; $i++) {
+		my %hash = ($sorted[$i] => $events{$sorted[$i]}{'count'});
+		push(@top_entries, \%hash);
+	}
+	push(@top_entries, { 'other' => $total });
+	return \@top_entries;
+}
+
+sub get_top_sources {
+	my $date = shift || undef;
+	my $select_query = "select src_host from logs";
+	if ($date) {
+		my ($start_of_day, $end_of_day) = @$date;
+		$select_query .= " where date >= $start_of_day and date <= $end_of_day";
+	}
+	my $sth = $dbh->prepare($select_query);
+	$sth->execute;
+	my %events;
+	my $total = 0;
+	while (my $result = $sth->fetchrow_hashref) {
+		next if (($result->{'src_host'} =~ /\:/) && ($ipv6 == 0));
+		$events{$result->{'src_host'}}{'count'}++;
+		$total++;
+	}
+	my @sorted = sort {
+		$events{$b}{'count'} <=> $events{$a}{'count'}
+	} keys %events;
+	my @top_entries;
+	$max_wedges = @sorted if ($max_wedges >= @sorted);
+	for (my $i=0; $i<$max_wedges; $i++) {
+		my %hash = ($sorted[$i] => $events{$sorted[$i]}{'count'});
+		push(@top_entries, \%hash);
+	}
+	push(@top_entries, { 'other' => $total });
+	return \@top_entries;
+}
+
+sub print_graph {
+	my ($data, $dir, $filename) = @_;
+	my $dbh = DBI->connect('dbi:Chart:') || die $DBI::errstr;
+	my $create_query = "CREATE TABLE pie (source CHAR(15), count FLOAT)";
+	$dbh->do($create_query);
+	my $sth = $dbh->prepare("INSERT INTO pie VALUES (?,?)");
+	foreach (@$data) {
+		my ($key, $value) = each(%$_);
+		$sth->execute($key, $value);
+	}
+	my $select_query = "SELECT PIECHART FROM pie WHERE WIDTH=? AND HEIGHT=? AND 
+				COLOR IN ('lred', 'lgreen', 'blue', 'yellow', 'marine', 'purple', 
+						'orange', 'lblue', 'pink', 'cyan', 'lyellow') AND 
+				BACKGROUND='white' AND SIGNATURE=?";
+	my $rsth = $dbh->prepare($select_query);
+	my ($sec, $min, $hour, $day) = @{[localtime]}[0..3];
+	$sec = sprintf("%02d", $sec);
+	$min = sprintf("%02d", $min);
+	$hour = sprintf("%02d", $hour);
+	my $month = [split(/ /,localtime)]->[1];
+	my $timestamp = "$month $day $hour:$min:$sec";
+	$rsth->execute($width, $height, $timestamp);
+	my $result = $rsth->fetchrow_arrayref;
+	open(BAR, ">$graphs_dir/$filename") || die "Can't open file for writing: $!";
+	binmode BAR;
+	print BAR $$result[0];
+	close(BAR);
+	$dbh->do('DROP TABLE pie');
+}
+

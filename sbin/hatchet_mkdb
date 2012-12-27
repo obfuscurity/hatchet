@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+#
+# Hatchet db initialization
+# v 0.9.2
+# Jason Dixon <jason@dixongroup.net>
+# http://www.dixongroup.net/hatchet/
+#
+ 
+use strict;
+use DBI;
+
+our $db_file;
+require "/var/www/hatchet/conf/hatchet.conf";
+
+my $dbh = DBI->connect("DBI:SQLite:dbname=$db_file", "", "") || die $DBI::errstr;
+ 
+my $create_table = '
+create table logs (
+id integer primary key,
+date varchar(15),
+points varchar(6),
+rulenum smallint(5),
+action varchar(10),
+interface varchar(8),
+proto varchar(15),
+src_host text,
+src_port text,
+dst_host text,
+dst_port text,
+comment text);';
+ 
+my $sth = $dbh->prepare($create_table);
+$sth->execute || die $dbh->stderr;
+
+print "Installed sqlite DB file at $db_file\n*SUCCESS*\n\n";

@@ -1,0 +1,129 @@
+<html>
+<head>
+<title>Firewall Log Viewer</title>
+<link rel="stylesheet" type="text/css" href="<TMPL_VAR name="css_file">" title="Default">
+</head>
+<body>
+
+<div id="header">
+	<ul>
+		<li class="left">
+			<form name="search" method="GET" action="/cgi/events.pl">
+				<select name="month">
+					<option value="0"<TMPL_VAR name=month0>>Jan</option>
+					<option value="1"<TMPL_VAR name=month1>>Feb</option>
+					<option value="2"<TMPL_VAR name=month2>>Mar</option>
+					<option value="3"<TMPL_VAR name=month3>>Apr</option>
+					<option value="4"<TMPL_VAR name=month4>>May</option>
+					<option value="5"<TMPL_VAR name=month5>>Jun</option>
+					<option value="6"<TMPL_VAR name=month6>>Jul</option>
+					<option value="7"<TMPL_VAR name=month7>>Aug</option>
+					<option value="8"<TMPL_VAR name=month8>>Sep</option>
+					<option value="9"<TMPL_VAR name=month9>>Oct</option>
+					<option value="10"<TMPL_VAR name=month10>>Nov</option>
+					<option value="11"<TMPL_VAR name=month11>>Dec</option>
+				</select>
+				<input type="text" name="day" size="2" maxlength="2">
+			</form>
+		</li>
+		<li class="right">
+			<span class="mini">pf log analyser</span>
+			<span>Hatchet</span>
+		</li>
+	</ul>
+	<ul style="padding: 0 0 10px 0;">
+		<li class="left">
+			<a href="events.pl">Home</a>
+		</li>
+		<li class="left">
+			<a href="http://www.dixongroup.net/hatchet/faq.html">FAQ</a>
+		</li>
+		<li class="left">
+			<a href="http://www.dixongroup.net/hatchet/index.html">Support</a>
+		</li>
+		<li style="width: 30px;">&nbsp;</li>
+		<li class="left">
+			<span class="graphs">Hosts:</span>
+		</li>
+		<li class="left">
+			<a class="graphs" href="../graphs/hosts_all.png" target="_new">all</a>
+		</li>
+		<li class="left">
+			<a class="graphs" href="../graphs/hosts_today.png" target="_new">today</a>
+		</li>
+		<li class="left">
+			<span class="graphs">Ports:</span>
+		</li>
+		<li class="left">
+			<a class="graphs" href="../graphs/ports_all.png" target="_new">all</a>
+		</li>
+		<li class="left">
+			<a class="graphs" href="../graphs/ports_today.png" target="_new">today</a>
+		</li>
+	</ul>
+</div>
+
+<div id="main">
+
+<table id="main" border="0" cellpadding="0" cellspacing="0" width="100%">
+
+<thead id="captions">
+	<tr>
+		<th style="width: 150px;">
+			<a href="/cgi/events.pl?sort=date<TMPL_VAR name="date"><TMPL_VAR name="opts">">date</a>
+		</th>
+		<th style="width: 75px;">
+			<a href="/cgi/events.pl?sort=rule<TMPL_VAR name="date"><TMPL_VAR name="opts">">rule</a>
+		</th>
+		<th style="width: 100px;">
+			<a href="/cgi/events.pl?sort=action<TMPL_VAR name="date"><TMPL_VAR name="opts">">action</a>
+		</th>
+		<th style="width: 75px;">
+			<a href="/cgi/events.pl?sort=intf<TMPL_VAR name="date"><TMPL_VAR name="opts">">interface</a>
+		</th>
+		<th style="width: 175px;">
+			<a href="/cgi/events.pl?sort=src<TMPL_VAR name="date"><TMPL_VAR name="opts">">source</a>
+		</th>
+		<th style="width: 175px;">
+			<a href="/cgi/events.pl?sort=dst<TMPL_VAR name="date"><TMPL_VAR name="opts">">destination</a>
+		</th>
+		<th style="width: 116px;">
+			<a href="/cgi/events.pl?sort=svc<TMPL_VAR name="date"><TMPL_VAR name="opts">">service</a>
+		</th>
+	</tr>
+</thead>
+
+<tbody id="main">
+	<TMPL_LOOP name="data">
+	<tr>
+		<td style="width: 150px;"<TMPL_VAR name="alt">>
+			<TMPL_VAR name="date">
+		</td>
+		<td style="width: 75px;"<TMPL_VAR name="alt">>
+			<a href="rule.pl?rule=<TMPL_VAR name="id">" onCtdck="window.open(this.href,'userHelp','width=400,height=20,scrollbars=no'); return false;"><TMPL_VAR name="rulenum"></a>
+		</td>
+		<td style="width: 100px;"<TMPL_VAR name="alt">>
+			<TMPL_VAR name="action">
+		</td>
+		<td style="width: 75px;"<TMPL_VAR name="alt">>
+			<TMPL_VAR name="interface">
+		</td>
+		<td style="width: 175px;"<TMPL_VAR name="alt">>
+			<TMPL_VAR name="src_host">
+		</td>
+		<td style="width: 175px;"<TMPL_VAR name="alt">>
+			<TMPL_VAR name="dst_host">
+		</td>
+		<td style="width: 100px;"<TMPL_VAR name="alt">>
+			<TMPL_VAR name="dst_port_href">
+		</td>
+	</tr>
+	</TMPL_LOOP>
+</tbody>
+
+</table>
+
+</div>
+
+</body>
+</html>

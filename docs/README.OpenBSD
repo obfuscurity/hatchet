@@ -1,0 +1,39 @@
+# Hatchet README.OpenBSD
+# v 0.9.2
+# Jason Dixon <jason@dixongroup.net>
+# http://www.dixongroup.net/hatchet/
+#
+
+To finish installing Hatchet, the following steps must be completed.
+
+1) Install mod_perl (www/mod_perl) and enable the module
+
+	$ sudo mod_perl-enable
+
+2) Add an entry in httpd.conf and restart httpd.  Example:
+
+        <VirtualHost _default_:80>
+            DocumentRoot /var/www/hatchet
+            PerlModule Apache::PerlRun
+            <Location /cgi/>
+                SetHandler perl-script
+                PerlHandler Apache::PerlRun
+                PerlRequire /var/www/hatchet/cgi/startup.pl
+                Options ExecCGI
+                PerlSendHeader On
+                allow from all
+            </Location>
+        </VirtualHost>
+
+3) Create the database
+
+	$ cd /var/www/hatchet/sbin/
+	$ sudo ./hatchet_mkdb
+
+4) Add the following lines in crontab.  If done as a non-root user, 
+    make sure to use sudo.
+
+	14,29,44,59 * * * *     sudo /var/www/hatchet/sbin/hatchet
+	19,34,49,04 * * * *     sudo /var/www/hatchet/sbin/hatchart
+
+

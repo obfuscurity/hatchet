@@ -1,0 +1,125 @@
+body {
+	background: #fff;
+	color: #000;
+	font-family: Verdana, Helvetica, Arial;
+	font-size: 80%;
+	padding: 0;
+	}
+table, td, a {
+	color: #000;
+	}
+#header div {
+	position: relative;
+	float: left; 
+	width: 850px;
+	}
+#header ul {
+	position: relative;
+	float: left;
+	background: #bba;
+	width: 850px;
+	border: 0px groove black;
+	padding: 15px 0 0 0;
+	margin: 0 0 0 0px;
+	}
+#header li {
+	position: relative;
+	float: left;
+	border: 0px groove black;
+	padding: 0;
+	display: block;
+	margin: 0 0 0 10px;
+	}
+#header li.right {
+	position: relative;
+	float: right;
+	font-weight: bold;
+	font-size: 150%;
+	margin: 0 15px 5px 0;
+	}
+#header .mini {
+	font-weight: normal;
+	font-size: 50%;
+	padding: 0 3px 0 0;
+	}
+#header a {
+	font-weight: bold;
+	text-decoration: none;
+	}
+#header select, input {
+	font-size: 70%;
+	}
+#main div {
+	clear: both;
+	border: 1px groove #000;
+	height: 480px;
+	overflow: auto;
+	width: 866px;
+	}
+#main table {
+	float: left;
+	width: 850px;
+	}
+#captions th {
+	background: #910;
+	color: #fff;
+	border-left: 1px solid #a55;
+	border-right: 1px solid #700;
+	border-top: 1px solid #a55;
+	font-weight: bold;
+	font-size: 80%;
+	padding: 3px 0 3px 0;
+	text-align: center;
+	}
+#main a, #main a:link, #main a:visited {
+	color: #000;
+	display: block;
+	text-decoration: none;
+	width: 100%;
+	}
+#main a:hover, #header a:hover {
+	color: #d54;
+	display: block;
+	width: 100%;
+	}
+#main a:hover {
+	color: #000;
+	text-decoration: underline;
+	}
+#main tbody {
+	display: block;
+	height: 457px;
+	overflow: auto;
+	margin: 5px 0 0 0;
+	}
+#main tr {
+	display: block;
+	text-align: center;
+	width: 100%;
+	}
+#main td {
+	background: #fff;
+	font-size: 80%;
+	border: 0px solid black;
+	text-align: center;
+	padding: 2px 0 0 0;
+	width: 100%
+	}
+#main td.alt {
+	background: #ddd;
+	}
+#captions a, #captions a:link, #captions a:visited {
+	color: #fff;
+	}
+#header span.graphs {
+	font-weight: bold;
+	}
+#header a.graphs:link, #header a.graphs:hover, #header a.graphs:visited {
+	display: block;
+	color: blue;
+	font-weight: normal;
+	text-decoration: none;
+	width: 100%;
+	padding: 0;
+	margin: 0;
+	}
