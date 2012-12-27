@@ -30,13 +30,13 @@ GD::Text (graphics/p5-GD-TextUtil)
 HTML::Template (www/p5-HTML-Template)
 ```
 
-Install mod_perl (www/mod_perl) and enable the module:
+Install mod_perl (`www/mod_perl`) and enable the module:
 
 ```bash
 $ sudo mod_perl-enable
 ```
 
-Add an entry in httpd.conf and restart httpd. Example:
+Add an entry in `httpd.conf` and restart httpd. Example:
 
 ```
         <VirtualHost _default_:80>
@@ -53,7 +53,7 @@ Add an entry in httpd.conf and restart httpd. Example:
         </VirtualHost>
 ```
 
-Create the database
+Create the database:
 
 ```bash
 $ cd /var/www/hatchet/sbin/
