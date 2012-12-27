@@ -2,11 +2,9 @@
 
 ## Overview
 
-Hatchet is a log parsing/presentation program written for OpenBSD's PF logs. The main script, "hatchet", should be run every 15 minutes, or as often as you wish. Depending on the size of your logfiles versus the speed of your machine, you may wish to tweak how often it runs.
+Hatchet is a log parsing/presentation program written for OpenBSD's PF logs. The main script, `hatchet`, should be run every 15 minutes, or as often as you wish. Depending on the size of your logfiles versus the speed of your machine, you may wish to tweak how often it runs.
 
-Hatchet uses a series of Perl regexes to match entries from the pflog logs. The log entries are stored in a SQLite database file, allowing for highly dynamic queries and statistics. If it finds one it doesn't have a match for, it will kick off an email to the system administrator (root@localhost) with the details. This setting can be modified in the configuration file (hatchet.conf).
-
-Thanks for trying out Hatchet. Please email me with your feedback, compliments, etc.
+Hatchet uses a series of Perl regexes to match entries from the pflog logs. The log entries are stored in a SQLite database file, allowing for highly dynamic queries and statistics. If it finds one it doesn't have a match for, it will kick off an email to the system administrator (`root@localhost`) with the details. This setting can be modified in the configuration file (`hatchet.conf`).
 
 ## Installation
 
@@ -15,8 +13,8 @@ Hatchet uses the default OpenBSD httpd chroot. This is made possible thanks to m
 Install the Hatchet directory:
 
 ```bash
-$ tar zxvf hatchet-0.9.2.tar.gz
-$ sudo mv hatchet-0.9.2 /var/www/hatchet
+$ cd /var/www/
+$ sudo git clone https://github.com/obfuscurity/hatchet.git
 ```
 
 Install the following Perl modules:
@@ -71,7 +69,7 @@ Add the cron entries:
 
 Hatchet parses PF logs and saves the events in a simple SQLite database. The average PF user should already be familiar with the logging features in PF, but it bears mention here as well.
 
-Logging is enabled on a per-rule basis using the "log" keyword. The use of this option should be considered carefully, as it is very easy to overwhelm your firewall with useless event logging. I have seen users with a "pass log all" default match, then complain on the Hatchet mailing list about slow response time in their web interface. This is an easy way to subscribe yourself to my /dev/null.
+Logging is enabled on a per-rule basis using the `log` keyword. The use of this option should be considered carefully, as it is very easy to overwhelm your firewall with useless event logging. I have seen users with a `pass log all` default match, then complain on the Hatchet mailing list about slow response time in their web interface. This is an easy way to subscribe yourself to my `/dev/null`.
 
 Utilize the log feature to your benefit, not your detriment. Keep in mind that the purpose of good logs are to keep an audit trail of unwanted traffic, and more specifically, notify you of possible attacks (although an IDS is the correct tool for that task). The "noise ratio" should not become so problematic that useful events are overlooked or ignored.
 
@@ -89,7 +87,7 @@ Good example:
     block in log on $ext_if inet proto tcp port 445
 ```
 
-Although the filter results are the same, the 2nd example takes advantage of the "last match" philosophy. It will only log TCP packets destined for port 445 on the external interface. The previous example will log every silly packet that isn't explicitly passed, including those on the local LAN.
+Although the filter results are the same, the 2nd example takes advantage of the `last match` philosophy. It will only log TCP packets destined for port 445 on the external interface. The previous example will log every silly packet that isn't explicitly passed, including those on the local LAN.
 
 ## License
 
